@@ -44,4 +44,5 @@ val sharedSettings: Seq[Def.Setting[?]] = Seq(
   scalacOptions := Seq(),
 )
 
+addCommandAlias("format", List("scalafmt", "Test / scalafmt").mkString(";"))
 

@@ -16,7 +16,7 @@ import zio.{Scope, Task, URIO, ZIO, ZIOAppArgs, ZIOAppDefault, ZLayer, Config as
 import java.sql.Connection
 
 object DoobieZio0 extends ZIOAppDefault:
-  
+
   // zio code is type ZIO[R,E,A]
   // and code that takes part in a transaction is ConnectionIO. So separate
 

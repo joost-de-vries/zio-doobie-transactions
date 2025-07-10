@@ -16,13 +16,13 @@ import javax.sql.DataSource
 
 object DoobieZio2 extends ZIOAppDefault:
 
-  // code that takes part in a transaction doesn't have a different type
+  // code that takes part in a transaction doesn't have a different type. Just Task[A]
 
   override def run: ZIO[ZIOAppArgs & Scope, Any, Any] = for
     _ <- ZIO.logInfo("ZIO doobie using FiberRef")
     dataSource <- setup
 
-    (result1, result2) <- dataSource.transactional {
+    (result1, result2) <- dataSource.transactional:
       for
         first <- sql"SELECT 1".query[Int].unique.toZio
 
@@ -31,7 +31,7 @@ object DoobieZio2 extends ZIOAppDefault:
 
         second <- sql"SELECT random()".query[Double].unique.toZio
       yield (first, second)
-    }
+
     _ <- ZIO.logInfo(s"Result $result1, $result2")
   yield ()
 
@@ -39,27 +39,17 @@ object DoobieZio2 extends ZIOAppDefault:
     def toZio: Task[A] =
       withConnectionZio(connection => sqlProgram.foldMap(interp).run.apply(connection))
 
-  def withConnection[A](task: Connection => A): Task[A] =
-    withConnectionZio(c => ZIO.attemptBlocking(task(c)))
-
-  def withConnectionZio[R, E, A](task: Connection => ZIO[R, E, A]): ZIO[R, E, A] =
-    currentConnection.get.flatMap {
-      case Some(connection) => task(connection)
-      case None             => ZIO.die(Exception(s"No transaction started"))
-    }
-
   extension (dataSource: DataSource)
     def transactional[A](task: Task[A]): Task[A] =
-      withConnectionZio {
+      withConnectionZio:
         for
           _ <- withConnection(_.setAutoCommit(false))
           result <- task.orRollback
           _ <- withConnection(_.commit())
         yield result
-      }
 
     def withConnectionZio[A](task: Task[A]): Task[A] =
-      ZIO.scoped[Any] {
+      ZIO.scoped[Any]:
         for
           connection <- ZIO.fromAutoCloseable(ZIO.attemptBlocking(dataSource.getConnection()))
           result <- currentConnection.locallyWith {
@@ -67,7 +57,14 @@ object DoobieZio2 extends ZIOAppDefault:
             case None        => Some(connection)
           }(task)
         yield result
-      }
+
+  def withConnection[A](task: Connection => A): Task[A] =
+    withConnectionZio(c => ZIO.attemptBlocking(task(c)))
+
+  def withConnectionZio[R, E, A](task: Connection => ZIO[R, E, A]): ZIO[R, E, A] =
+    currentConnection.get.flatMap:
+      case Some(connection) => task(connection)
+      case None             => ZIO.die(Exception(s"No transaction started"))
 
   val currentConnection: FiberRef[Option[Connection]] =
     Unsafe.unsafe { implicit unsafe =>

@@ -23,7 +23,7 @@ object DoobieZio3 extends ZIOAppDefault:
     _ <- ZIO.logInfo("ZIO doobie using implicit functions")
     dataSource <- setup
 
-    (result1, result2) <- dataSource.transactional { connection ?=> // if we don't use the connection we can leave this out
+    (result1, result2) <- dataSource.transactional: connection ?=> // if we don't use the connection we can leave this out
       for
         first <- sql"SELECT 1".query[Int].unique.toZio
 
@@ -32,30 +32,27 @@ object DoobieZio3 extends ZIOAppDefault:
 
         second <- sql"SELECT random()".query[Double].unique.toZio
       yield (first, second)
-    }
+
     _ <- ZIO.logInfo(s"Result $result1, $result2")
   yield ()
 
-  extension [A](doobieProgram: ConnectionIO[A]) 
-    def toZio: Transactional[A] = connection ?=> doobieProgram.foldMap(interp).run.apply(connection)
+  extension [A](doobieProgram: ConnectionIO[A]) def toZio: Transactional[A] = connection ?=> doobieProgram.foldMap(interp).run.apply(connection)
 
   extension (dataSource: DataSource)
     def transactional[A](task: Transactional[A]): Task[A] =
-      withConnection { connection ?=>
+      withConnection: connection ?=>
         for
           _ <- ZIO.attemptBlocking(connection.setAutoCommit(false))
           result <- task.orRollback
           _ <- ZIO.attemptBlocking(connection.commit())
         yield result
-      }
 
     def withConnection[A](task: Transactional[A]): Task[A] =
-      ZIO.scoped[Any] {
+      ZIO.scoped[Any]:
         for
           connection <- ZIO.fromAutoCloseable(ZIO.attemptBlocking(dataSource.getConnection()))
           result <- task.apply(using connection)
         yield result
-      }
 
   private lazy val interp = KleisliInterpreter[Task](LogHandler.noop).ConnectionInterpreter
 

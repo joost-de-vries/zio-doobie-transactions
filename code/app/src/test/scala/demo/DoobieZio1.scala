@@ -29,7 +29,7 @@ object DoobieZio1 extends ZIOAppDefault:
     _ <- ZIO.logInfo("ZIO doobie using environment")
     dataSource <- setup
 
-    (result1, result2) <- dataSource.transactional {
+    (result1, result2) <- dataSource.transactional:
       for
         first <- sql"SELECT 1".query[Int].unique.toZio // Transactional[Int]
 
@@ -38,37 +38,32 @@ object DoobieZio1 extends ZIOAppDefault:
 
         second <- sql"SELECT random()".query[Double].unique.toZio // another sql
       yield (first, second)
-    }
+
     _ <- ZIO.logInfo(s"Result $result1, $result2")
   yield ()
 
   extension [A](sqlProgram: ConnectionIO[A])
     def toZio: Transactional[A] =
       ZIO.serviceWithZIO[Connection](connection => sqlProgram.foldMap(interp).run.apply(connection))
-  
-
 
   def withConnection[A](task: Connection => A): Transactional[A] =
     ZIO.serviceWithZIO[Connection](connection => ZIO.attemptBlocking(task(connection)))
 
   extension (dataSource: DataSource)
     def transactional[A](prog: Transactional[A]): Task[A] =
-      withConnectionZio[A] {
+      withConnectionZio[A]:
         for
           _ <- withConnection(_.setAutoCommit(false))
           result <- prog.orRollback
           _ <- withConnection(_.commit())
         yield result
-      }
 
     def withConnectionZio[A](task: Transactional[A]): Task[A] =
-      ZIO.scoped[Any] {
+      ZIO.scoped[Any]:
         for
           connection <- ZIO.fromAutoCloseable(ZIO.attemptBlocking(dataSource.getConnection()))
           result <- task.provide(ZLayer.succeed(connection))
         yield result
-      }
-
 
   extension [A](prog: Transactional[A])
     def orRollback: Transactional[A] = prog.sandbox
