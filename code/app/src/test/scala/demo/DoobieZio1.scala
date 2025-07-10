@@ -81,16 +81,6 @@ object DoobieZio1 extends ZIOAppDefault:
 
   private lazy val interp = KleisliInterpreter[Task](LogHandler.noop).ConnectionInterpreter
 
-//  case class HasConnection(connection: Connection, logHandler: Option[LogHandler[Task]] = None):
-//
-//    private lazy val interp = KleisliInterpreter[Task](logHandler.getOrElse(LogHandler.noop)).ConnectionInterpreter
-//
-//    def withConnection[A](doobieProgram: ConnectionIO[A]): Task[A] =
-//      doobieProgram.foldMap(interp).run.apply(connection)
-//
-//    def withConnectionX[A](doobieProgram: ConnectionIO[A]): Connection => Task[A] =
-//      doobieProgram.foldMap(interp).run
-
   override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] = Main.logging
 
   def setup: URIO[Scope, HikariDataSource] =
