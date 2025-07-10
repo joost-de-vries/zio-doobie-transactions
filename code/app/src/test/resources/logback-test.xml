@@ -1,0 +1,15 @@
+<configuration>
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%cyan(%d{HH:mm:ss.SSS}) %highlight(%-5level) %gray([%thread]) %magenta(%logger{36}) - %msg%n%kvp%n
+      </pattern>
+    </encoder>
+  </appender>
+
+  <logger name="io.dhlparcel.locker.api" level="TRACE"/>
+  <logger name="org.apache.kafka" level="INFO" />
+  <logger name="com.zaxxer" level="WARN" />
+  <root level="INFO">
+    <appender-ref ref="STDOUT"/>
+  </root>
+</configuration>

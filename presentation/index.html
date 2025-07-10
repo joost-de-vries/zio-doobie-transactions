@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+		<title>reveal.js</title>
+
+		<link rel="stylesheet" href="dist/reset.css">
+		<link rel="stylesheet" href="dist/reveal.css">
+		<link rel="stylesheet" href="dist/theme/moon.css">
+
+		<!-- Theme used for syntax highlighted code -->
+		<link rel="stylesheet" href="plugin/highlight/monokai.css">
+	</head>
+	<body>
+		<div class="reveal">
+			<div class="slides">
+				<section><h3>Doobie & transaction scoping</h3></section>
+
+				<section> <!--1. the problem -->
+										<section><h3>The problem</h3></section>
+
+				<section>
+					<p>Two tables: <code>session</code> and <code>clickcollect</code></p>
+					Either we want both inserts to succeed or none
+				</section>
+				<section>
+					ZIO
+	<pre><code data-trim data-noescape class="language-scala">
+def insertSession(userId: ClickCollectUserId, state: State): UIO[(Session, ClickCollectRecord[State])] =
+	for
+		now <- Clock.instant
+		(initialSession, record) <- insertClickCollectQuery(userId, state, now).transaction
+		_ <- ZIO.foreachDiscard(initialSession.existingStartedAt)(time =>
+			ZIO.logWarning(s"Still existing session when initiating new session. Existing session started at ${time.toString}")
+		)
+	yield (initialSession.session, record)
+	</code></pre>				
+				</section>
+				<section>
+					ConnectionIO
+  <pre><code data-trim data-noescape class="language-scala">
+private def insertClickCollectQuery(userId: ClickCollectUserId, state: State, now: Instant): ConnectionIO[(InitResult, ClickCollectRecord[State])] = for
+	initialSession <- SessionRepository.insertQuery(userId, now)
+	record <- insertQuery(initialSession.session.id, state, now).unique
+yield (initialSession, record)
+
+trait SessionRepository{
+  def insertQuery(userId: UserId, now: Instant): ConnectionIO[InitResult] = for
+    maybeActive <- SessionRepository.findActiveQuery(userId).option
+    _ <- maybeActive.traverse(active => SessionRepository.setEndedAtQuery(active.id, now).run)
+    session = Session.initial(userId, now)
+    _ <- SessionRepository.insertQuery(session).run
+  yield InitResult(session, maybeActive.map(_.createdAt))
+}
+  </code></pre>
+</section>
+<section>
+	In ZIO code the 'pieces' are mostly <code>ZIO[R, E, A]</code>
+	but the Doobie sql parts are <code>ConnectionIO</code>
+</section>
+<section>
+	So what can we do?
+</section>
+<section>
+	<ul>
+		<li class="fragment">have them in separate zio's. Not shared transaction
+			<ul>
+				<li class="fragment">Easy to do unwittingly</li>
+			</ul>
+		</li>
+		<li class="fragment">have ConnectionIO methods separate from ZIO methods that need a transactor
+			<ul>
+			<li class="fragment">so that you can reuse them in different combinations</li>
+      </ul>
+		</li>
+		<li class="fragment">parametrize the repo over the effect <code>F[_]</code></li>
+		<li class="fragment">...</li>
+		<li class="fragment">allow marking of arbitrary zio code as transactional</li>
+	</ul>
+</section>
+<section>
+	<pre><code data-trim data-noescape class="language-java">
+@Transactional
+public void createCourse(Course course) {
+    courseDao.create(course);
+    throw new DataIntegrityViolationException("Throwing exception for demoing Rollback!!!");
+}
+	</code></pre>
+</section>
+<section><p>how do we do that?</p>
+		<ul>
+		<li class="fragment">using ZIO R environment</li>
+		<li class="fragment">like in java</li>
+		<li class="fragment">with scala 3 capabilities</li>
+	</ul>
+
+
+</section>
+
+</section>
+				<section>
+					<section><h3>How does Doobie <code>ConnectionIO</code> work?</h3></section>
+					<section>
+						<div class="fragment">sql program</div><div class="fragment"> => interpreter</div><div class="fragment"> => connection</div><div class="fragment"> => result</div></section>
+					<section><p>sql program</p>
+						<code>ConnectionIO[A]</code>
+						<p>is a</p>
+						<code>Free[ConnectionOp, A]</code>
+						<p class="fragment">a program of <code>ConnectionOp</code> that can be interpreted and will return <code>A</code></p>
+						<p class="fragment">a <code>ConnectionOp</code> is something you can do with a jdbc transaction. Do an insert, set a savepoint, rollback etc</p>
+					</section>
+					<section><p>interpreter</p>
+						<code>ConnectionOp ~> Kleisli[Task, Connection, *]</code>
+								<ul>
+		<li class="fragment"><code>~></code> is a <code>FunctionK</code>. transform monad <code>A</code> to <code>B</code>. F.i. <code>ZIO.fromTry</code> transforms a <code>Try[A]</code> to a <code>Task[A]</code></li>
+		<li class="fragment"><code>Kleisli[Task, A, B]</code>  is a function <code>A => Task[B]</code></li>
+		<li class="fragment">so we give the interpreter a sql program and it gives us a function that needs a connection to give result</li>
+	</ul>
+					</section>
+					<section>A Doobie <code>Transactor</code> contains
+						<ul>
+							<li>a source of jdbc <code>Connection</code></li>
+							<li>an interpreter</li>
+							<li>a <code>Strategy</code> which knows what to do before, after, onError</li>
+						</ul>
+					</section>
+				</section>
+				<section>
+					<section><h3>3 solutions for arbitrary scoping</h3></section>
+					<section>
+						<p>a simple sql program. ZIO code and transactions live in separate worlds.</p>
+						See demo.DoobieZio0.scala
+					</section>
+					<section><p>transactional scoping of our zio code that we see in the types</p>
+						See demo.DoobieZio1.scala
+					</section>
+					<section><p>transactional scoping of our zio code that we don't see in the types</p>
+						See demo.DoobieZio2.scala
+					</section>
+					<section><p>transactional scoping of our zio code with scala 3 context functions</p>
+						See demo.DoobieZio2.scala
+					</section>
+				</section>
+				<section>
+
+					<section><h3>Discussion: how to use transactional scoping</h3></section>
+					<section>Some use cases and pitfalls
+						<ul>
+							<li class="fragment">all tasks should succeed or none</li>
+							<li class="fragment">prevent concurrent updates (pessimistic locking)</li>
+							<li class="fragment">simple batch runner. Multiple service instances but only one job runs</li>
+							<li class="fragment">be careful with how long tasks take in the transactional scope. 
+								<ul>
+									<li>If they sometimes take, say, seconds it can deplete your connection pool. </li>
+                  <li>So put timeout guards and/or use separate connection pool</li>
+									</ul>
+								</li>
+						</ul>
+					</section>
+				</section>
+			</div>
+		</div>
+
+		<script src="dist/reveal.js"></script>
+		<script src="plugin/notes/notes.js"></script>
+		<script src="plugin/markdown/markdown.js"></script>
+		<script src="plugin/highlight/highlight.js"></script>
+		<script>
+			// More info about initialization & config:
+			// - https://revealjs.com/initialization/
+			// - https://revealjs.com/config/
+			Reveal.initialize({
+				hash: true,
+
+				// Learn about plugins: https://revealjs.com/plugins/
+				plugins: [ RevealMarkdown, RevealHighlight, RevealNotes ]
+			});
+		</script>
+	</body>
+</html>

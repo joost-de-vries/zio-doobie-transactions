@@ -1,0 +1,25 @@
+.DS_Store
+.idea
+*.iml
+target
+.env
+*.auto-build-changes
+lib/
+logs/
+pom.xml
+*.semanticdb
+
+# IDEs
+.metals/
+metals.sbt
+**/.bloop
+.vscode/
+.bsp
+.scannerwork
+/.sdkmanrc
+
+tag.txt
+version.txt
+courierGenerated/*
+
+clickCollectGenerated/*
