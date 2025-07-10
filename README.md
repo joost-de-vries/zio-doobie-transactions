@@ -1,4 +1,4 @@
-# how to Doobie, zio and jdbc transaction scoping
+# how to do arbitrary transaction scoping with Zio and Doobie
 
 
 To see the presentation go to `/presentation`  
