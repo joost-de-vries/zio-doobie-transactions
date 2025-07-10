@@ -6,7 +6,7 @@ import zio.{UIO, ULayer, ZIO, ZLayer}
 import scala.concurrent.duration.Duration
 
 case class Config(
-    database: DatabaseConfig,
+    database: DatabaseConfig
 ) derives ConfigReader
 
 object Config:

@@ -5,6 +5,4 @@ import zio.{Exit, Runtime, Scope, ULayer, URLayer, ZIO, ZIOAppArgs, ZIOAppDefaul
 
 object Main:
 
-
   val logging: ULayer[Unit] = Runtime.removeDefaultLoggers >>> SLF4J.slf4j
-end Main
