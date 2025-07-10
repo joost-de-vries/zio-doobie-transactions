@@ -1,7 +1,8 @@
 # how to do arbitrary transaction scoping with Zio and Doobie
 
+To see the presentation [go to](presentation/index.html)
 
-To see the presentation go to `/presentation`  
+Or run the revealjs server:     
 ```cd presentation && npm install```    
 and then
 ```npm start```  
