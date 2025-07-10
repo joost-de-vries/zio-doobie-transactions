@@ -1,4 +1,4 @@
-import Dependencies.{ *}
+import Dependencies.*
 import sbt.{Def, ThisBuild}
 
 import java.io
@@ -9,8 +9,6 @@ val scalaVersionValue = "3.7.1"
 
 ThisBuild / scalaVersion := scalaVersionValue
 ThisBuild / scalacOptions ++= Seq("-language:strictEquality")
-ThisBuild / scalaFmtRunnerDialect := "scala3"
-ThisBuild / disableDhlScalafmtSettings := true
 ThisBuild / versionScheme := Some("early-semver")
 ThisBuild / publish / skip := true
 ThisBuild / publishLocal / skip := true
