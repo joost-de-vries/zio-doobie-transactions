@@ -16,17 +16,18 @@
 	<body>
 		<div class="reveal">
 			<div class="slides">
-				<section><h3>Doobie & transaction scoping</h3></section>
+				<section><h3>Doobie, Zio & transaction scoping</h3></section>
 
-				<section> <!--1. the problem -->
-										<section><h3>The problem</h3></section>
+				<section>
+					<section><h3>The problem</h3>
+				</section>
 
 				<section>
 					<p>Two tables: <code>session</code> and <code>clickcollect</code></p>
 					Either we want both inserts to succeed or none
 				</section>
 				<section>
-					ZIO
+					<h4><code>ZIO</code></h4>
 	<pre><code data-trim data-noescape class="language-scala">
 def insertSession(userId: ClickCollectUserId, state: State): UIO[(Session, ClickCollectRecord[State])] =
 	for
@@ -39,7 +40,7 @@ def insertSession(userId: ClickCollectUserId, state: State): UIO[(Session, Click
 	</code></pre>				
 				</section>
 				<section>
-					ConnectionIO
+					<h4><code>ConnectionIO</code></h4>
   <pre><code data-trim data-noescape class="language-scala">
 private def insertClickCollectQuery(userId: ClickCollectUserId, state: State, now: Instant): ConnectionIO[(InitResult, ClickCollectRecord[State])] = for
 	initialSession <- SessionRepository.insertQuery(userId, now)
@@ -57,27 +58,28 @@ trait SessionRepository{
   </code></pre>
 </section>
 <section>
-	In ZIO code the 'pieces' are mostly <code>ZIO[R, E, A]</code>
+	In ZIO code the 'pieces' are mostly <code>ZIO[R,E,A]</code>
 	but the Doobie sql parts are <code>ConnectionIO</code>
+	<p>Two worlds</p>
 </section>
 <section>
 	So what can we do?
 </section>
 <section>
 	<ul>
-		<li class="fragment">have them in separate zio's. Not shared transaction
+		<li class="fragment">Have them in separate zio's. No shared transaction
 			<ul>
 				<li class="fragment">Easy to do unwittingly</li>
 			</ul>
 		</li>
-		<li class="fragment">have ConnectionIO methods separate from ZIO methods that need a transactor
+		<li class="fragment">Have ConnectionIO methods separate from ZIO methods that need a transactor
 			<ul>
-			<li class="fragment">so that you can reuse them in different combinations</li>
+			<li class="fragment">So that you can reuse them in different combinations</li>
       </ul>
 		</li>
-		<li class="fragment">parametrize the repo over the effect <code>F[_]</code></li>
+		<li class="fragment">Parametrize the repo over the effect <code>F[_]</code></li>
 		<li class="fragment">...</li>
-		<li class="fragment">allow marking of arbitrary zio code as transactional</li>
+		<li class="fragment">Allow marking of arbitrary zio code as transactional</li>
 	</ul>
 </section>
 <section>
@@ -89,13 +91,12 @@ public void createCourse(Course course) {
 }
 	</code></pre>
 </section>
-<section><p>how do we do that?</p>
+<section><p>How do we do that?</p>
 		<ul>
-		<li class="fragment">using ZIO R environment</li>
+		<li class="fragment">using <code>ZIO</code> <code>R</code> environment</li>
 		<li class="fragment">like in java</li>
-		<li class="fragment">with scala 3 capabilities</li>
+		<li class="fragment">with scala 3 context functions</li>
 	</ul>
-
 
 </section>
 
@@ -103,23 +104,31 @@ public void createCourse(Course course) {
 				<section>
 					<section><h3>How does Doobie <code>ConnectionIO</code> work?</h3></section>
 					<section>
+						<h4>Doobie sql evaluation</h4>
 						<div class="fragment">sql program</div><div class="fragment"> => interpreter</div><div class="fragment"> => connection</div><div class="fragment"> => result</div></section>
-					<section><p>sql program</p>
+					<section><h4>Sql program</h4>
 						<code>ConnectionIO[A]</code>
 						<p>is a</p>
 						<code>Free[ConnectionOp, A]</code>
 						<p class="fragment">a program of <code>ConnectionOp</code> that can be interpreted and will return <code>A</code></p>
 						<p class="fragment">a <code>ConnectionOp</code> is something you can do with a jdbc transaction. Do an insert, set a savepoint, rollback etc</p>
 					</section>
-					<section><p>interpreter</p>
+					<section><h4>Interpreter</h4>
 						<code>ConnectionOp ~> Kleisli[Task, Connection, *]</code>
 								<ul>
-		<li class="fragment"><code>~></code> is a <code>FunctionK</code>. transform monad <code>A</code> to <code>B</code>. F.i. <code>ZIO.fromTry</code> transforms a <code>Try[A]</code> to a <code>Task[A]</code></li>
+		<li class="fragment"><code>~></code> is a <code>FunctionK</code>
+			<ul>
+				<li class="fragment">Transform monad <code>A[_]</code> to <code>B[_]</code></li>
+				<li class="fragment"> F.i. <code>ZIO.fromTry</code> transforms a <code>Try[A]</code> to a <code>Task[A]</code></li>
+			</ul>
+		</li>
 		<li class="fragment"><code>Kleisli[Task, A, B]</code>  is a function <code>A => Task[B]</code></li>
 		<li class="fragment">so we give the interpreter a sql program and it gives us a function that needs a connection to give result</li>
 	</ul>
 					</section>
-					<section>A Doobie <code>Transactor</code> contains
+					<section>
+						<h4>Transactor</h4>
+						A Doobie <code>Transactor</code> contains
 						<ul>
 							<li>a source of jdbc <code>Connection</code></li>
 							<li>an interpreter</li>
@@ -130,36 +139,46 @@ public void createCourse(Course course) {
 				<section>
 					<section><h3>3 solutions for arbitrary scoping</h3></section>
 					<section>
-						<p>a simple sql program. ZIO code and transactions live in separate worlds.</p>
+						<h4>Standard Doobie Zio</h4>
+						<p>A simple sql program. ZIO code and transactions live in separate worlds.</p>
 						See demo.DoobieZio0.scala
 					</section>
-					<section><p>transactional scoping of our zio code that we see in the types</p>
+					<section>
+						<h4>Typed</h4>
+						<p>Transactional scoping of our zio code that we see in the types</p>
 						See demo.DoobieZio1.scala
 					</section>
-					<section><p>transactional scoping of our zio code that we don't see in the types</p>
+					<section>
+						<h4>Untyped</h4>
+						<p>Transactional scoping of our zio code that we don't see in the types</p>
 						See demo.DoobieZio2.scala
 					</section>
-					<section><p>transactional scoping of our zio code with scala 3 context functions</p>
+					<section>
+						<h4>Scala 3</h4>
+						<p>Transactional scoping of our zio code with scala 3 context functions</p>
 						See demo.DoobieZio3.scala
 					</section>
 					<section>To do: lift zio into ConnectionIO</section>
 				</section>
 				<section>
 
-					<section><h3>Discussion: how to use transactional scoping</h3></section>
-					<section>Some use cases and pitfalls
+				<section><h3>Discussion: how to use transactional scoping</h3></section>
+					<section><h4>Some use cases and pitfalls</h4>
 						<ul>
-							<li class="fragment">all tasks should succeed or none</li>
-							<li class="fragment">prevent concurrent updates (pessimistic locking)</li>
-							<li class="fragment">simple batch runner. Multiple service instances but only one job runs</li>
-							<li class="fragment">be careful with how long tasks take in the transactional scope. 
+							<li class="fragment">All tasks should succeed or none</li>
+							<li class="fragment">Prevent concurrent updates (pessimistic locking)</li>
+							<li class="fragment">Simple batch runner. Multiple service instances but only one job runs</li>
+							<li class="fragment">Be careful with how long tasks take in the transactional scope 
 								<ul>
-									<li>If they sometimes take, say, seconds it can deplete your connection pool. </li>
-                  <li>So put timeout guards and/or use separate connection pool</li>
+									<li class="fragment">If they sometimes take, say, seconds it can deplete your connection pool </li>
+                  <li class="fragment">So put timeout guards and/or use separate connection pool</li>
 									</ul>
 								</li>
 						</ul>
 					</section>
+				</section>
+				<section>
+					<h1>Fin</h1>
 				</section>
 			</div>
 		</div>
