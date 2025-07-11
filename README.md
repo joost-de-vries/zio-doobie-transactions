@@ -1,7 +1,6 @@
 # how to do arbitrary transaction scoping with Zio and Doobie
 
 To see the presentation [go to](https://the-source.it/zio-doobie-transactions/presentation/index.html)
-To see the presentation [go to github pages](https://the-source.it/zio-doobie-transactions/presentation/index.html)
 
 Or run the revealjs server:     
 ```cd presentation && npm install```    
