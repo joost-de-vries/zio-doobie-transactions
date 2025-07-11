@@ -79,10 +79,16 @@ trait SessionRepository{
 		</li>
 		<li class="fragment">Parametrize the repo over the effect <code>F[_]</code></li>
 		<li class="fragment">...</li>
-		<li class="fragment">Allow marking of arbitrary zio code as transactional</li>
+		<li class="fragment">Allow marking of arbitrary zio code as transactional
+			<ul>
+		<li class="fragment">One monad to rule them all: zio</li>
+
+			</ul>
+		</li>
 	</ul>
 </section>
 <section>
+	Like in Kotlin / Java
 	<pre><code data-trim data-noescape class="language-java">
 @Transactional
 public void createCourse(Course course) {
@@ -94,7 +100,7 @@ public void createCourse(Course course) {
 <section><p>How do we do that?</p>
 		<ul>
 		<li class="fragment">using <code>ZIO</code> <code>R</code> environment</li>
-		<li class="fragment">like in java</li>
+		<li class="fragment">like in java: store in fiber context</li>
 		<li class="fragment">with scala 3 context functions</li>
 	</ul>
 
@@ -104,8 +110,21 @@ public void createCourse(Course course) {
 				<section>
 					<section><h3>How does Doobie <code>ConnectionIO</code> work?</h3></section>
 					<section>
+						<h4>Transactor</h4>
+						A Doobie <code>Transactor</code> contains
+						<ul>
+							<li>a source of jdbc <code>Connection</code></li>
+							<li>an interpreter</li>
+							<li>a <code>Strategy</code> which knows what to do before, after, onError</li>
+						</ul>
+					</section>
+
+					<section>
 						<h4>Doobie sql evaluation</h4>
-						<div class="fragment">sql program</div><div class="fragment"> => interpreter</div><div class="fragment"> => connection</div><div class="fragment"> => result</div></section>
+						<p>
+						<span class="fragment">sql program</span><span class="fragment"> ⇒ interpreter</span><span class="fragment"> ⇒ connection</span><span class="fragment"> ⇒ result</span>
+						</p>
+					</section>
 					<section><h4>Sql program</h4>
 						<code>ConnectionIO[A]</code>
 						<p>is a</p>
@@ -119,21 +138,16 @@ public void createCourse(Course course) {
 		<li class="fragment"><code>~></code> is a <code>FunctionK</code>
 			<ul>
 				<li class="fragment">Transform monad <code>A[_]</code> to <code>B[_]</code></li>
-				<li class="fragment"> F.i. <code>ZIO.fromTry</code> transforms a <code>Try[A]</code> to a <code>Task[A]</code></li>
+				<li class="fragment">Like <code>ZIO.fromTry</code> transforms a <code>Try[A]</code> to a <code>Task[A]</code></li>
 			</ul>
 		</li>
 		<li class="fragment"><code>Kleisli[Task, A, B]</code>  is a function <code>A => Task[B]</code></li>
-		<li class="fragment">so we give the interpreter a sql program and it gives us a function that needs a connection to give result</li>
+		<li class="fragment">so we give the interpreter a sql program and it gives us a function that needs a connection to give the result</li>
 	</ul>
 					</section>
 					<section>
-						<h4>Transactor</h4>
-						A Doobie <code>Transactor</code> contains
-						<ul>
-							<li>a source of jdbc <code>Connection</code></li>
-							<li>an interpreter</li>
-							<li>a <code>Strategy</code> which knows what to do before, after, onError</li>
-						</ul>
+						<emu>'a function that needs a connection to give the result'</em>
+						<p class="fragment">this is something we can do as a zio...  <span class="fragment">💡</span></p>
 					</section>
 				</section>
 				<section>
@@ -141,6 +155,7 @@ public void createCourse(Course course) {
 					<section>
 						<h4>Standard Doobie Zio</h4>
 						<p>A simple sql program. ZIO code and transactions live in separate worlds.</p>
+						<p>(for comparison)</p>
 						See <a href="https://github.com/joost-de-vries/zio-doobie-transactions/blob/master/code/app/src/test/scala/demo/DoobieZio0.scala"><code>demo.DoobieZio0.scala</code></a>
 					</section>
 					<section>
@@ -158,7 +173,10 @@ public void createCourse(Course course) {
 						<p>Transactional scoping of our zio code with scala 3 context functions</p>
 						See <a href="https://github.com/joost-de-vries/zio-doobie-transactions/blob/master/code/app/src/test/scala/demo/DoobieZio3.scala"><code>demo.DoobieZio3.scala</code></a>
 					</section>
-					<section>To do: lift zio into ConnectionIO</section>
+					<section>Other approach: lift zio into ConnectionIO
+						<p class="fragment">But then you still have two separate worlds: zio and ConnectionIO</p>
+
+					</section>
 				</section>
 				<section>
 
