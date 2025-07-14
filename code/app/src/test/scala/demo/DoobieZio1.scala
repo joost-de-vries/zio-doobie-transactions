@@ -6,7 +6,7 @@ import cats.effect.*
 import cats.effect.implicits.*
 import com.zaxxer.hikari.HikariDataSource
 import demo.Database.hikariDataSource
-import demo.{Config, Main}
+import demo.{Config, Logging}
 import doobie.*
 import doobie.free.KleisliInterpreter
 import doobie.implicits.*
@@ -76,7 +76,7 @@ object DoobieZio1 extends ZIOAppDefault:
 
   private lazy val interp = KleisliInterpreter[Task](LogHandler.noop).ConnectionInterpreter
 
-  override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] = Main.logging
+  override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] = Logging.logging
 
   def setup: URIO[Scope, HikariDataSource] =
     (for

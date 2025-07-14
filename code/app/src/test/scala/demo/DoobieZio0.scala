@@ -2,7 +2,7 @@ package demo
 
 import cats.*
 import cats.data.*
-import demo.{Config, Database, Main}
+import demo.{Config, Database, Logging}
 import doobie.*
 import doobie.free.KleisliInterpreter
 import doobie.free.connection.ConnectionOp
@@ -69,7 +69,7 @@ object DoobieZio0 extends ZIOAppDefault:
 
   private lazy val interp: ConnectionOp ~> Transactional = KleisliInterpreter[Task](LogHandler.noop).ConnectionInterpreter
 
-  override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] = Main.logging
+  override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] = Logging.logging
 
   def setup: URIO[Scope, Transactor[Task]] =
     for

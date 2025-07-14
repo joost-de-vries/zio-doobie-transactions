@@ -2,7 +2,7 @@ package demo
 
 import com.zaxxer.hikari.HikariDataSource
 import demo.Database.hikariDataSource
-import demo.{Config, Database, Main}
+import demo.{Config, Database, Logging}
 import doobie.*
 import doobie.free.KleisliInterpreter
 import doobie.syntax.all.*
@@ -82,7 +82,7 @@ object DoobieZio2 extends ZIOAppDefault:
         case cause =>
           withConnection(_.rollback()) *> ZIO.failCause(cause)
 
-  override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] = Main.logging
+  override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] = Logging.logging
 
   def setup: URIO[Scope, HikariDataSource] =
     (for
