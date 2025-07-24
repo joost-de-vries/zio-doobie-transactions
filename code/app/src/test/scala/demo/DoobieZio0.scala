@@ -6,7 +6,6 @@ import demo.{Config, Database, Logging}
 import doobie.*
 import doobie.free.KleisliInterpreter
 import doobie.free.connection.ConnectionOp
-import doobie.implicits.*
 import doobie.syntax.all.*
 import doobie.util.log.LogHandler
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry

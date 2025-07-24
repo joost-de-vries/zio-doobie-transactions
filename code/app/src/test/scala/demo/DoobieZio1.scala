@@ -2,21 +2,18 @@ package demo
 
 import cats.*
 import cats.data.Kleisli
-import cats.effect.*
-import cats.effect.implicits.*
 import com.zaxxer.hikari.HikariDataSource
 import demo.Database.hikariDataSource
 import demo.{Config, Logging}
 import doobie.*
 import doobie.free.KleisliInterpreter
-import doobie.implicits.*
 import doobie.syntax.all.*
 import doobie.util.log.LogHandler
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import zio.interop.catz.*
 import zio.{Cause, Scope, Task, URIO, ZIO, ZIOAppArgs, ZIOAppDefault, ZLayer, Config as _, Duration as _, *}
 
-import java.sql.{Connection, SQLException}
+import java.sql.Connection
 import javax.sql.DataSource
 
 object DoobieZio1 extends ZIOAppDefault:
@@ -68,10 +65,7 @@ object DoobieZio1 extends ZIOAppDefault:
   extension [A](prog: Transactional[A])
     def orRollback: Transactional[A] = prog.sandbox
       .mapError(_.untraced)
-      .catchAll:
-        case cause @ Cause.Fail(t: SQLException, _) =>
-          withConnection(_.rollback()) *> ZIO.failCause(cause)
-        case cause =>
+      .catchAll: cause =>
           withConnection(_.rollback()) *> ZIO.failCause(cause)
 
   private lazy val interp = KleisliInterpreter[Task](LogHandler.noop).ConnectionInterpreter

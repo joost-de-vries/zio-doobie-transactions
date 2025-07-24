@@ -23,11 +23,12 @@ object DoobieZio3 extends ZIOAppDefault:
     _ <- ZIO.logInfo("ZIO doobie using implicit functions")
     dataSource <- setup
 
-    (result1, result2) <- dataSource.transactional: connection ?=> // if we don't use the connection we can leave this out
+    (result1, result2) <- dataSource.transactional:
       for
         first <- sql"SELECT 1".query[Int].unique.toZio
 
-        savepoint <- ZIO.attemptBlocking(connection.setSavepoint("my savepoint"))
+        savepoint <- connection.setSavepoint("my savepoint").blocking
+        
         _ <- ZIO.logInfo(s"saved point '${savepoint.getSavepointName}'")
 
         second <- sql"SELECT random()".query[Double].unique.toZio
@@ -35,7 +36,9 @@ object DoobieZio3 extends ZIOAppDefault:
 
     _ <- ZIO.logInfo(s"Result $result1, $result2")
   yield ()
-
+  
+  def connection(using conn: Connection): Connection = conn
+  
   extension [A](doobieProgram: ConnectionIO[A]) def toZio: Transactional[A] = connection ?=> doobieProgram.foldMap(interp).run.apply(connection)
 
   extension (dataSource: DataSource)
@@ -54,16 +57,16 @@ object DoobieZio3 extends ZIOAppDefault:
           result <- task.apply(using connection)
         yield result
 
-  private lazy val interp = KleisliInterpreter[Task](LogHandler.noop).ConnectionInterpreter
-
   extension [A](task: Transactional[A])
     def orRollback: Transactional[A] = task.sandbox
       .mapError(_.untraced)
-      .catchAll:
-        case cause @ Cause.Fail(t: SQLException, _) =>
+      .catchAll: cause =>
           ZIO.attemptBlocking(summon[Connection].rollback()) *> ZIO.failCause(cause)
-        case cause =>
-          ZIO.attemptBlocking(summon[Connection].rollback()) *> ZIO.failCause(cause)
+
+  extension [A](task: => A)
+    def blocking: UIO[A] = ZIO.attemptBlocking(task).orDie
+
+  private lazy val interp = KleisliInterpreter[Task](LogHandler.noop).ConnectionInterpreter
 
   override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] = Logging.logging
 

@@ -2,7 +2,7 @@ package demo
 
 import com.zaxxer.hikari.HikariDataSource
 import demo.Database.hikariDataSource
-import demo.{Config, Database, Logging}
+import demo.{Config, Logging}
 import doobie.*
 import doobie.free.KleisliInterpreter
 import doobie.syntax.all.*
@@ -11,7 +11,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import zio.interop.catz.*
 import zio.{Cause, Scope, Task, URIO, ZIO, ZIOAppArgs, ZIOAppDefault, ZLayer, Config as _, Duration as _, *}
 
-import java.sql.{Connection, SQLException}
+import java.sql.Connection
 import javax.sql.DataSource
 
 object DoobieZio2 extends ZIOAppDefault:
@@ -51,12 +51,13 @@ object DoobieZio2 extends ZIOAppDefault:
     def withConnectionZio[A](task: Task[A]): Task[A] =
       ZIO.scoped[Any]:
         for
-          connection <- ZIO.fromAutoCloseable(ZIO.attemptBlocking(dataSource.getConnection()))
+          connection <- ZIO.fromAutoCloseable(dataSource.getConnection().blocking)
           result <- currentConnection.locallyWith {
             case s @ Some(c) => println(s"already tx"); s
             case None        => Some(connection)
           }(task)
         yield result
+
 
   def withConnection[A](task: Connection => A): Task[A] =
     withConnectionZio(c => ZIO.attemptBlocking(task(c)))
@@ -71,18 +72,19 @@ object DoobieZio2 extends ZIOAppDefault:
       FiberRef.unsafe.make(None)
     }
 
-  private lazy val interp = KleisliInterpreter[Task](LogHandler.noop).ConnectionInterpreter
-
   extension [A](task: Task[A])
     def orRollback: Task[A] = task.sandbox
       .mapError(_.untraced)
-      .catchAll:
-        case cause @ Cause.Fail(t: SQLException, _) =>
-          withConnection(_.rollback()) *> ZIO.failCause(cause)
-        case cause =>
+      .catchAll: cause =>
           withConnection(_.rollback()) *> ZIO.failCause(cause)
 
+  extension [A](task: => A)
+    def blocking: UIO[A] =
+      ZIO.attemptBlocking(task).orDie
+
   override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] = Logging.logging
+
+  private lazy val interp = KleisliInterpreter[Task](LogHandler.noop).ConnectionInterpreter
 
   def setup: URIO[Scope, HikariDataSource] =
     (for
