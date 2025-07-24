@@ -23,7 +23,7 @@ object DoobieZio3 extends ZIOAppDefault:
     _ <- ZIO.logInfo("ZIO doobie using implicit functions")
     dataSource <- setup
 
-    (result1, result2) <- dataSource.transactional: connection ?=> // if we don't use the connection we can leave this out
+    (result1, result2) <- dataSource.transactional:
       for
         first <- sql"SELECT 1".query[Int].unique.toZio
 
@@ -35,6 +35,8 @@ object DoobieZio3 extends ZIOAppDefault:
 
     _ <- ZIO.logInfo(s"Result $result1, $result2")
   yield ()
+  
+  def connection(using c: Connection): Connection = c
 
   extension [A](doobieProgram: ConnectionIO[A]) def toZio: Transactional[A] = connection ?=> doobieProgram.foldMap(interp).run.apply(connection)
 
