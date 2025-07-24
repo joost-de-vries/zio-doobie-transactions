@@ -28,7 +28,7 @@ object DoobieZio3 extends ZIOAppDefault:
         first <- sql"SELECT 1".query[Int].unique.toZio
 
         savepoint <- connection.setSavepoint("my savepoint").blocking
-        
+
         _ <- ZIO.logInfo(s"saved point '${savepoint.getSavepointName}'")
 
         second <- sql"SELECT random()".query[Double].unique.toZio
@@ -36,9 +36,9 @@ object DoobieZio3 extends ZIOAppDefault:
 
     _ <- ZIO.logInfo(s"Result $result1, $result2")
   yield ()
-  
+
   def connection(using conn: Connection): Connection = conn
-  
+
   extension [A](doobieProgram: ConnectionIO[A]) def toZio: Transactional[A] = connection ?=> doobieProgram.foldMap(interp).run.apply(connection)
 
   extension (dataSource: DataSource)
